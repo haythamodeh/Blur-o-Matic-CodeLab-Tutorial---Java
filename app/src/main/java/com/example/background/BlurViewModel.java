@@ -16,8 +16,13 @@
 
 package com.example.background;
 
+import static com.example.background.Constants.KEY_IMAGE_URI;
+
 import androidx.annotation.NonNull;
 import androidx.lifecycle.ViewModel;
+import androidx.work.Data;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
 
 import android.app.Application;
 import android.content.ContentResolver;
@@ -26,13 +31,17 @@ import android.content.res.Resources;
 import android.net.Uri;
 import android.text.TextUtils;
 
+import com.example.background.workers.BlurWorker;
+
 public class BlurViewModel extends ViewModel {
 
     private Uri mImageUri;
+    private WorkManager mWorkManager;
 
     public BlurViewModel(@NonNull Application application) {
         super();
         mImageUri = getImageUri(application.getApplicationContext());
+        mWorkManager = WorkManager.getInstance(application);
     }
 
     /**
@@ -40,7 +49,12 @@ public class BlurViewModel extends ViewModel {
      * @param blurLevel The amount to blur the image
      */
     void applyBlur(int blurLevel) {
+        OneTimeWorkRequest blurRequest =
+                new OneTimeWorkRequest.Builder(BlurWorker.class)
+                        .setInputData(createInputDataForUri())
+                        .build();
 
+        mWorkManager.enqueue(blurRequest);
     }
 
     private Uri uriOrNull(String uriString) {
@@ -48,6 +62,18 @@ public class BlurViewModel extends ViewModel {
             return Uri.parse(uriString);
         }
         return null;
+    }
+
+    /**
+     * Creates the input data bundle which includes the Uri to operate on
+     * @return Data which contains the Image Uri as a String
+     */
+    private Data createInputDataForUri() {
+        Data.Builder builder = new Data.Builder();
+        if (mImageUri != null) {
+            builder.putString(KEY_IMAGE_URI, mImageUri.toString());
+        }
+        return builder.build();
     }
 
     private Uri getImageUri(Context context) {
